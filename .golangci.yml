@@ -11,7 +11,7 @@ formatters:
       simplify: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - govet          # suspicious constructs
     - errcheck       # unchecked errors
@@ -19,7 +19,6 @@ linters:
     - ineffassign    # useless assignments
     - unused         # unused code
     - gosec          # security issues
-
-linters-settings:
-  errcheck:
-    check-blank: true
+  settings:
+    errcheck:
+      check-blank: true
