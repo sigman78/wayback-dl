@@ -1,4 +1,4 @@
-module wayback-dl
+module github.com/sigman78/wayback-dl
 
 go 1.21
 
