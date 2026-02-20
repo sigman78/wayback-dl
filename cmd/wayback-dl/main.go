@@ -25,6 +25,7 @@ Options:
   -canonical string       Canonical tag handling: keep|remove (default: keep)
   -exact-url              Download only the exact URL, no wildcard /*
   -external-assets        Also download off-site (external) assets
+  -stop-on-error          Stop immediately on first download error (default: continue)
   -debug                  Enable verbose debug logging
   -version                Print version and exit
   -h / -help              Show this help and exit
@@ -47,6 +48,7 @@ func main() {
 		canonical    string
 		exactURL     bool
 		extAssets    bool
+		stopOnError  bool
 		debug        bool
 	)
 
@@ -59,6 +61,7 @@ func main() {
 	fs.StringVar(&canonical, "canonical", "keep", "Canonical tag handling: keep|remove")
 	fs.BoolVar(&exactURL, "exact-url", false, "Download only the exact URL, no wildcard /*")
 	fs.BoolVar(&extAssets, "external-assets", false, "Also download off-site (external) assets")
+	fs.BoolVar(&stopOnError, "stop-on-error", false, "Stop immediately on first download error")
 	fs.BoolVar(&debug, "debug", false, "Enable verbose debug logging")
 
 	// Handle -version / -h / -help before the flag parser so we control the exit code.
@@ -134,6 +137,7 @@ func main() {
 		RewriteLinks:           rewriteLinks,
 		CanonicalAction:        canonical,
 		DownloadExternalAssets: extAssets,
+		StopOnError:            stopOnError,
 		Debug:                  debug,
 	}
 

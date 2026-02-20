@@ -31,6 +31,7 @@ type Config struct {
 	CanonicalAction        string
 	DownloadExternalAssets bool
 	Debug                  bool
+	StopOnError            bool
 }
 
 var downloadHTTPClient = &http.Client{
@@ -69,7 +70,7 @@ func DownloadAll(cfg *Config) error {
 	defer pool.Release()
 
 	g, ctx := errgroup.WithContext(context.Background())
-	var processed atomic.Int32
+	var processed, failed atomic.Int32
 
 	for _, snap := range manifest {
 		s := snap
@@ -83,10 +84,26 @@ func DownloadAll(cfg *Config) error {
 			}); err != nil {
 				return fmt.Errorf("submit task: %w", err)
 			}
-			return <-errCh
+			if err := <-errCh; err != nil {
+				if cfg.StopOnError {
+					return err
+				}
+				failed.Add(1)
+				if cfg.Debug {
+					log.Printf("download error %s: %v", s.FileURL, err)
+				}
+			}
+			return nil
 		})
 	}
-	return g.Wait()
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	if n := failed.Load(); n > 0 {
+		fmt.Printf("%d resource(s) failed to download.\n", n)
+	}
+	return nil
 }
 
 // downloadOne downloads a single snapshot and optionally rewrites its links.
