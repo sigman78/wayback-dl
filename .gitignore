@@ -1,6 +1,6 @@
 # Compiled binary
-wayback-dl
-wayback-dl.exe
+/wayback-dl
+/wayback-dl.exe
 
 # Download output
 websites/
