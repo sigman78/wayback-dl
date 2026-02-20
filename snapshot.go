@@ -3,7 +3,6 @@ package main
 import (
 	"net/url"
 	"sort"
-	"strings"
 )
 
 // Snapshot represents a single archived file to download.
@@ -38,7 +37,7 @@ func (idx *SnapshotIndex) Register(rawURL, timestamp string) {
 		return
 	}
 
-	pathKey := strings.ToLower(u.Host) + u.Path
+	pathKey := u.Path
 	queryKey := pathKey
 	if u.RawQuery != "" {
 		queryKey += "?" + u.RawQuery
@@ -106,7 +105,7 @@ func (idx *SnapshotIndex) Resolve(assetURL, fallback string) string {
 		return fallback
 	}
 
-	pathKey := strings.ToLower(u.Host) + u.Path
+	pathKey := u.Path
 	queryKey := pathKey
 	if u.RawQuery != "" {
 		queryKey += "?" + u.RawQuery
