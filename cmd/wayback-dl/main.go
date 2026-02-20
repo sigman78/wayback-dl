@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/sigman78/wayback-dl/internal/wayback"
 )
 
 func usage() {
@@ -108,7 +110,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	base, err := NormalizeBaseURL(urlFlag)
+	base, err := wayback.NormalizeBaseURL(urlFlag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: invalid URL: %v\n", err)
 		os.Exit(1)
@@ -119,7 +121,7 @@ func main() {
 		outDir = "websites/" + base.BareHost
 	}
 
-	cfg := &Config{
+	cfg := &wayback.Config{
 		BaseURL:                base.CanonicalURL,
 		Variants:               base.Variants,
 		BareHost:               base.BareHost,
@@ -136,7 +138,7 @@ func main() {
 	}
 
 	fmt.Printf("Fetching snapshot index for %s ...\n", base.CanonicalURL)
-	if err := DownloadAll(cfg); err != nil {
+	if err := wayback.DownloadAll(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}

@@ -1,4 +1,4 @@
-package main
+package wayback
 
 import (
 	"encoding/json"

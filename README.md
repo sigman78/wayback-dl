@@ -1,4 +1,4 @@
-# wayback-dl
+# 💾 wayback-dl
 
 A fast, self-contained command-line tool for downloading archived websites from
 the [Wayback Machine](https://web.archive.org/). 
