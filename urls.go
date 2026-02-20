@@ -178,7 +178,7 @@ func URLToLocalPath(rawURL string) string {
 	// Use only the path — the output directory already encodes the domain.
 	p := strings.TrimLeft(u.Path, "/")
 	p = strings.ReplaceAll(p, "//", "/")
-	p = EnsureLocalTarget(p)        // call BEFORE appending query
+	p = EnsureLocalTarget(p) // call BEFORE appending query
 	if u.RawQuery != "" {
 		p += "?" + u.RawQuery
 	}
