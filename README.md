@@ -9,17 +9,12 @@ Go adaptation of [wayback-machine-downloader](https://github.com/birbwatcher/way
 
 ## Install
 
-```sh
-go install wayback-dl@latest
-```
-
-Or build from source:
+Download release or build from source:
 
 ```sh
 git clone ...
 cd wayback-dl
-go build -o wayback-dl .        # Linux / macOS
-go build -o wayback-dl.exe .    # Windows
+make build
 ```
 
 Requires Go 1.21+.
@@ -108,10 +103,45 @@ Everything else uses the Go standard library.
 ## Testing
 
 ```sh
-# Validation tests (exit codes)
-powershell -ExecutionPolicy Bypass -File test.ps1
-
 # Build + smoke test
-go build -o wayback-dl.exe .
-./wayback-dl.exe example.com -from 20200101 -to 20200201 -threads 2
+make build
+./wayback-dl example.com -from 20200101 -to 20200201 -threads 2
 ```
+
+---
+
+## Development
+
+```sh
+# Install tooling (one-time)
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+go install github.com/goreleaser/goreleaser/v2@latest
+
+# Build with version info
+make build
+
+# Run tests
+make test
+
+# Run linter
+make lint
+
+# Activate pre-commit hook (per clone)
+git config core.hooksPath .githooks
+```
+
+---
+
+## Release
+
+Releases are automated via [goreleaser](https://goreleaser.com/) and GitHub Actions.
+Push a semver tag to trigger a release:
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The CI workflow (`ci.yml`) runs on every push to `main`/`master` and on pull
+requests. The release workflow (`release.yml`) triggers on `v*` tags and publishes
+cross-compiled binaries for Linux, macOS, and Windows.

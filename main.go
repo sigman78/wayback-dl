@@ -24,6 +24,7 @@ Options:
   -exact-url              Download only the exact URL, no wildcard /*
   -external-assets        Also download off-site (external) assets
   -debug                  Enable verbose debug logging
+  -version                Print version and exit
   -h / -help              Show this help and exit
 `)
 }
@@ -58,8 +59,12 @@ func main() {
 	fs.BoolVar(&extAssets, "external-assets", false, "Also download off-site (external) assets")
 	fs.BoolVar(&debug, "debug", false, "Enable verbose debug logging")
 
-	// Handle -h / -help before the flag parser so we control the exit code.
+	// Handle -version / -h / -help before the flag parser so we control the exit code.
 	for _, a := range os.Args[1:] {
+		if a == "-version" || a == "--version" {
+			fmt.Printf("wayback-dl %s (commit %s, built %s)\n", version, commit, date)
+			os.Exit(0)
+		}
 		if a == "-h" || a == "-help" || a == "--help" {
 			usage()
 			os.Exit(0)
