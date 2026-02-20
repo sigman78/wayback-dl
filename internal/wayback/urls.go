@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 
+	sanitize "github.com/mrz1836/go-sanitize"
 	"golang.org/x/net/idna"
 )
 
@@ -120,19 +120,6 @@ func IsCSSResource(filePath, contentType string) bool {
 	return strings.ToLower(path.Ext(filePath)) == ".css"
 }
 
-// EnsureLocalTarget converts a bare directory path to an index file path.
-// e.g. "dir/" → "dir/index.html", "dir" → "dir/index.html", "" → "index.html"
-func EnsureLocalTarget(pathname string) string {
-	if pathname == "" || strings.HasSuffix(pathname, "/") {
-		return pathname + "index.html"
-	}
-	// If no extension treat it as a directory
-	if path.Ext(pathname) == "" {
-		return pathname + "/index.html"
-	}
-	return pathname
-}
-
 // RelativeLink returns the relative path from fromDir to toFile.
 func RelativeLink(fromDir, toFile string) string {
 	rel, err := filepath.Rel(filepath.FromSlash(fromDir), filepath.FromSlash(toFile))
@@ -147,41 +134,122 @@ func ToPosix(p string) string {
 	return strings.ReplaceAll(p, "\\", "/")
 }
 
-// WindowsSanitize escapes characters that are illegal in Windows filenames.
-// The path argument is always a relative URL-derived fragment (never an absolute
-// OS path with a drive letter), so all colons are safe to escape.
-// On non-Windows platforms it is a no-op.
-func WindowsSanitize(p string) string {
-	if runtime.GOOS != "windows" {
-		return p
-	}
-	replacer := strings.NewReplacer(
-		":", "%3A",
-		"*", "%2A",
-		"?", "%3F",
-		"<", "%3C",
-		">", "%3E",
-		"|", "%7C",
-	)
-	return replacer.Replace(p)
-}
-
 // URLToLocalPath converts an absolute URL to a relative filesystem path fragment
 // (no leading slash) suitable for joining with the output directory.
-// The output directory already encodes the domain, so only the path is used.
-func URLToLocalPath(rawURL string) string {
+//
+// When pretty is true, extension-less last segments are treated as directories
+// and resolved to index.html (e.g. /about → about/index.html).
+// When pretty is false, the original URL path structure is preserved: an
+// extension-less segment is kept as a plain file (e.g. /about → about).
+//
+// In both modes:
+//   - Each path segment is sanitized via sanitize.PathName (safe on Windows and
+//     any other OS); the file extension is separated first so the dot is never
+//     stripped.
+//   - Query parameters are decoded, key/value separators replaced with "_", and
+//     the result is appended before the file extension to keep names unique.
+//   - Explicit directory paths (trailing slash or empty) always resolve to
+//     index[_query].html inside the directory.
+func URLToLocalPath(rawURL string, pretty bool) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return "unknown"
 	}
 
-	// Use only the path — the output directory already encodes the domain.
-	p := strings.TrimLeft(u.Path, "/")
-	p = strings.ReplaceAll(p, "//", "/")
-	p = EnsureLocalTarget(p) // call BEFORE appending query
-	if u.RawQuery != "" {
-		p += "?" + u.RawQuery
+	isDir := u.Path == "" || strings.HasSuffix(u.Path, "/")
+
+	// Sanitize each path segment independently so we can handle the
+	// extension dot explicitly (sanitize.PathName strips dots).
+	var segments []string
+	for _, seg := range strings.Split(strings.Trim(u.Path, "/"), "/") {
+		if seg == "" {
+			continue
+		}
+		if s := sanitizeSegment(seg); s != "" {
+			segments = append(segments, s)
+		}
 	}
-	p = WindowsSanitize(p)
-	return p
+
+	var dirSegs []string
+	var filename string
+
+	switch {
+	case isDir || len(segments) == 0:
+		// Explicit directory or empty path: every segment is a directory.
+		dirSegs = segments
+		filename = buildIndexName(u.RawQuery)
+	default:
+		last := segments[len(segments)-1]
+		ext := path.Ext(last)
+		if ext == "" {
+			if pretty {
+				// Pretty: extension-less last segment → implicit directory.
+				dirSegs = segments
+				filename = buildIndexName(u.RawQuery)
+			} else {
+				// Preserve: extension-less last segment stays as a plain file.
+				dirSegs = segments[:len(segments)-1]
+				filename = buildFileName(last, "", u.RawQuery)
+			}
+		} else {
+			dirSegs = segments[:len(segments)-1]
+			filename = buildFileName(last, ext, u.RawQuery)
+		}
+	}
+
+	if len(dirSegs) > 0 {
+		return strings.Join(dirSegs, "/") + "/" + filename
+	}
+	return filename
+}
+
+// sanitizeSegment sanitizes a single URL path segment.
+// The extension is split off first and sanitized separately so it is
+// never discarded by PathName (which strips dots).
+func sanitizeSegment(seg string) string {
+	ext := path.Ext(seg)
+	if ext == "" {
+		return sanitize.PathName(seg)
+	}
+	base := sanitize.PathName(seg[:len(seg)-len(ext)])
+	extPart := sanitize.PathName(ext[1:]) // strip leading dot before sanitizing
+	if base == "" {
+		base = "file"
+	}
+	if extPart == "" {
+		return base
+	}
+	return base + "." + extPart
+}
+
+// buildIndexName returns "index[_querySuffix].html".
+func buildIndexName(rawQuery string) string {
+	return "index" + urlQuerySuffix(rawQuery) + ".html"
+}
+
+// buildFileName inserts the query suffix before the file extension so the
+// extension is always the final component of the filename.
+func buildFileName(sanitizedSeg, ext, rawQuery string) string {
+	base := sanitizedSeg[:len(sanitizedSeg)-len(ext)]
+	return base + urlQuerySuffix(rawQuery) + ext
+}
+
+// urlQuerySuffix converts a raw URL query string into a filesystem-safe
+// "_key_value" suffix, or "" when the query is empty.
+// Key/value separators (= &) are replaced with underscores before PathName
+// strips any remaining unsafe characters.
+func urlQuerySuffix(rawQuery string) string {
+	if rawQuery == "" {
+		return ""
+	}
+	decoded, err := url.QueryUnescape(rawQuery)
+	if err != nil {
+		decoded = rawQuery
+	}
+	q := strings.NewReplacer("=", "_", "&", "_").Replace(decoded)
+	s := sanitize.PathName(q)
+	if s == "" {
+		return ""
+	}
+	return "_" + s
 }

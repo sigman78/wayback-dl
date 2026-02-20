@@ -28,6 +28,7 @@ type Config struct {
 	ToTimestamp            string
 	Threads                int
 	RewriteLinks           bool
+	PrettyPath             bool
 	CanonicalAction        string
 	DownloadExternalAssets bool
 	Debug                  bool
@@ -114,7 +115,7 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 		return ctx.Err()
 	}
 
-	localPath := URLToLocalPath(snap.FileURL)
+	localPath := URLToLocalPath(snap.FileURL, cfg.PrettyPath)
 	localPath = filepath.Join(cfg.Directory, filepath.FromSlash(localPath))
 
 	// Skip existing files

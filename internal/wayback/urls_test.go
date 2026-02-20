@@ -1,11 +1,10 @@
 package wayback
 
 import (
-	"runtime"
 	"testing"
 )
 
-func TestURLToLocalPath(t *testing.T) {
+func TestURLToLocalPathPretty(t *testing.T) {
 	cases := []struct {
 		url  string
 		want string
@@ -14,77 +13,58 @@ func TestURLToLocalPath(t *testing.T) {
 		{"https://example.com/", "index.html"},
 		// Trailing slash directory
 		{"https://example.com/page/", "page/index.html"},
-		// Extension-less path treated as directory
+		// Extension-less path treated as directory (pretty mode)
 		{"https://example.com/dir/about", "dir/about/index.html"},
 		// File with extension kept as-is
 		{"https://example.com/style.css", "style.css"},
 		{"https://example.com/img/photo.jpg", "img/photo.jpg"},
+		// Query with extension: suffix inserted before extension
+		{"https://example.com/img/photo.jpg?v=2", "img/photo_v_2.jpg"},
+		// Multiple query params with extension
+		{"https://example.com/file.css?v=3&t=min", "file_v_3_t_min.css"},
 	}
 
 	for _, tc := range cases {
-		got := URLToLocalPath(tc.url)
+		got := URLToLocalPath(tc.url, true)
 		if got != tc.want {
-			t.Errorf("URLToLocalPath(%q)\n  got  %q\n  want %q", tc.url, got, tc.want)
+			t.Errorf("URLToLocalPath(%q, pretty)\n  got  %q\n  want %q", tc.url, got, tc.want)
+		}
+	}
+}
+
+func TestURLToLocalPathPreserve(t *testing.T) {
+	cases := []struct {
+		url  string
+		want string
+	}{
+		// Root still → index.html
+		{"https://example.com/", "index.html"},
+		// Trailing slash still → index.html inside directory
+		{"https://example.com/page/", "page/index.html"},
+		// Extension-less segment kept as plain file (not a directory)
+		{"https://example.com/dir/about", "dir/about"},
+		// Extension-less with query → file with query suffix
+		{"https://example.com/search?q=go", "search_q_go"},
+		// File with extension unchanged
+		{"https://example.com/style.css", "style.css"},
+		{"https://example.com/img/photo.jpg", "img/photo.jpg"},
+		// Query with extension: suffix before extension
+		{"https://example.com/img/photo.jpg?v=2", "img/photo_v_2.jpg"},
+	}
+
+	for _, tc := range cases {
+		got := URLToLocalPath(tc.url, false)
+		if got != tc.want {
+			t.Errorf("URLToLocalPath(%q, preserve)\n  got  %q\n  want %q", tc.url, got, tc.want)
 		}
 	}
 }
 
 func TestURLToLocalPathQuerySanitize(t *testing.T) {
-	// The query string is appended after EnsureLocalTarget; on Windows the
-	// literal '?' is escaped to %3F by WindowsSanitize.
-	got := URLToLocalPath("https://example.com/search?q=go")
-	var want string
-	if runtime.GOOS == "windows" {
-		want = "search/index.html%3Fq=go"
-	} else {
-		want = "search/index.html?q=go"
-	}
+	// Extension-less path with query → index_<query>.html in pretty mode.
+	got := URLToLocalPath("https://example.com/search?q=go", true)
+	want := "search/index_q_go.html"
 	if got != want {
-		t.Errorf("URLToLocalPath with query\n  got  %q\n  want %q", got, want)
-	}
-}
-
-func TestEnsureLocalTarget(t *testing.T) {
-	cases := []struct {
-		in   string
-		want string
-	}{
-		{"", "index.html"},          // empty → root index
-		{"dir/", "dir/index.html"},  // trailing slash
-		{"page", "page/index.html"}, // no extension → treated as directory
-		{"style.css", "style.css"},  // has extension → unchanged
-		{"img/photo.jpg", "img/photo.jpg"},
-	}
-
-	for _, tc := range cases {
-		got := EnsureLocalTarget(tc.in)
-		if got != tc.want {
-			t.Errorf("EnsureLocalTarget(%q)\n  got  %q\n  want %q", tc.in, got, tc.want)
-		}
-	}
-}
-
-func TestWindowsSanitize(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("WindowsSanitize is a no-op on non-Windows platforms")
-	}
-
-	cases := []struct {
-		in   string
-		want string
-	}{
-		{"normal/path/file.html", "normal/path/file.html"},
-		{"page?q=go", "page%3Fq=go"},
-		{"file:name", "file%3Aname"},
-		{"a*b", "a%2Ab"},
-		{"a<b>c", "a%3Cb%3Ec"},
-		{"a|b", "a%7Cb"},
-	}
-
-	for _, tc := range cases {
-		got := WindowsSanitize(tc.in)
-		if got != tc.want {
-			t.Errorf("WindowsSanitize(%q)\n  got  %q\n  want %q", tc.in, got, tc.want)
-		}
+		t.Errorf("URLToLocalPath with query (pretty)\n  got  %q\n  want %q", got, want)
 	}
 }
