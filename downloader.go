@@ -55,7 +55,7 @@ func DownloadAll(cfg *Config) error {
 	total := len(manifest)
 	fmt.Printf("Found %d unique snapshots to download.\n", total)
 
-	if err := os.MkdirAll(cfg.Directory, 0755); err != nil {
+	if err := os.MkdirAll(cfg.Directory, 0750); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}
 
@@ -106,7 +106,7 @@ func downloadOne(snap Snapshot, cfg *Config, idx *SnapshotIndex,
 	if err != nil {
 		return fmt.Errorf("http get: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Skip 404s gracefully
@@ -119,7 +119,7 @@ func downloadOne(snap Snapshot, cfg *Config, idx *SnapshotIndex,
 	}
 
 	// Ensure parent directory exists
-	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localPath), 0750); err != nil {
 		return fmt.Errorf("mkdirall: %w", err)
 	}
 
@@ -130,8 +130,8 @@ func downloadOne(snap Snapshot, cfg *Config, idx *SnapshotIndex,
 	}
 	tmpName := tmpFile.Name()
 	defer func() {
-		tmpFile.Close()
-		os.Remove(tmpName) // no-op if renamed
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpName) // no-op if renamed
 	}()
 
 	// Read first 512 bytes for content sniffing
@@ -145,9 +145,11 @@ func downloadOne(snap Snapshot, cfg *Config, idx *SnapshotIndex,
 	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
 		return fmt.Errorf("write body: %w", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("close temp: %w", err)
+	}
 
-	if err := os.Rename(tmpName, localPath); err != nil {
+	if err := os.Rename(tmpName, localPath); err != nil { //nolint:gosec // G703: localPath is sanitized by URLToLocalPath
 		return fmt.Errorf("rename: %w", err)
 	}
 
@@ -182,9 +184,6 @@ func WaybackAssetURL(assetURL, fallbackTS string, idx *SnapshotIndex) string {
 
 // isInternalHost returns true when host (stripped of www.) matches bareHost.
 func isInternalHost(host, bareHost string) bool {
-	h := strings.ToLower(host)
-	if strings.HasPrefix(h, "www.") {
-		h = h[4:]
-	}
+	h := strings.TrimPrefix(strings.ToLower(host), "www.")
 	return h == strings.ToLower(bareHost)
 }

@@ -10,11 +10,11 @@ import (
 
 var (
 	// Three patterns for url(): double-quoted, single-quoted, unquoted
-	reURLDouble  = regexp.MustCompile(`(?i)url\(\s*"([^"]+)"\s*\)`)
-	reURLSingle  = regexp.MustCompile(`(?i)url\(\s*'([^']+)'\s*\)`)
-	reURLBare    = regexp.MustCompile(`(?i)url\(\s*([^)'"]+?)\s*\)`)
-	reImportDbl  = regexp.MustCompile(`(?i)@import\s+"([^"]+)"`)
-	reImportSgl  = regexp.MustCompile(`(?i)@import\s+'([^']+)'`)
+	reURLDouble = regexp.MustCompile(`(?i)url\(\s*"([^"]+)"\s*\)`)
+	reURLSingle = regexp.MustCompile(`(?i)url\(\s*'([^']+)'\s*\)`)
+	reURLBare   = regexp.MustCompile(`(?i)url\(\s*([^)'"]+?)\s*\)`)
+	reImportDbl = regexp.MustCompile(`(?i)@import\s+"([^"]+)"`)
+	reImportSgl = regexp.MustCompile(`(?i)@import\s+'([^']+)'`)
 )
 
 // RewriteCSSContent rewrites url() and @import references in CSS text.
@@ -94,10 +94,10 @@ func RewriteCSSContent(css, pageURL string, cfg *Config, idx *SnapshotIndex) str
 
 // RewriteCSSFile reads a CSS file, rewrites its URLs, and writes it back.
 func RewriteCSSFile(filePath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filePath) //nolint:gosec // G304: path is written by this program
 	if err != nil {
 		return err
 	}
 	rewritten := RewriteCSSContent(string(data), pageURL, cfg, idx)
-	return os.WriteFile(filePath, []byte(rewritten), 0644)
+	return os.WriteFile(filePath, []byte(rewritten), 0600)
 }

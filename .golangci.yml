@@ -1,20 +1,25 @@
+version: "2"
+
 run:
   timeout: 5m
+
+formatters:
+  enable:
+    - gofmt
+  settings:
+    gofmt:
+      simplify: true
 
 linters:
   disable-all: true
   enable:
-    - gofmt          # canonical formatting
     - govet          # suspicious constructs
     - errcheck       # unchecked errors
-    - staticcheck    # advanced static analysis
-    - gosimple       # simplifiable code
+    - staticcheck    # advanced static analysis (includes gosimple checks)
     - ineffassign    # useless assignments
     - unused         # unused code
     - gosec          # security issues
 
 linters-settings:
-  gofmt:
-    simplify: true
   errcheck:
     check-blank: true

@@ -12,7 +12,7 @@ import (
 
 // ProcessHTML rewrites links and canonical tags in an HTML file.
 func ProcessHTML(filePath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
-	data, err := os.ReadFile(filePath)
+	data, err := os.ReadFile(filePath) //nolint:gosec // G304: path is written by this program
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func ProcessHTML(filePath, pageURL string, cfg *Config, idx *SnapshotIndex) erro
 	if err := html.Render(&buf, doc); err != nil {
 		return err
 	}
-	return os.WriteFile(filePath, buf.Bytes(), 0644)
+	return os.WriteFile(filePath, buf.Bytes(), 0600)
 }
 
 // attrName returns the relevant URL attribute for a given tag name.

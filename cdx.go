@@ -47,7 +47,7 @@ func fetchCDXPage(baseURL string, pageIndex int, fromTS, toTS string) ([]CDXEntr
 	if err != nil {
 		return nil, fmt.Errorf("cdx GET: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("cdx HTTP %d for %s", resp.StatusCode, apiURL)
