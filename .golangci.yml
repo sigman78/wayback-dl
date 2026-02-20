@@ -11,14 +11,28 @@ formatters:
       simplify: true
 
 linters:
-  default: none
+  # v2: Use 'standard', 'all', or 'fast' [2]
+  default: standard 
   enable:
-    - govet          # suspicious constructs
-    - errcheck       # unchecked errors
-    - staticcheck    # advanced static analysis (includes gosimple checks)
-    - ineffassign    # useless assignments
-    - unused         # unused code
-    - gosec          # security issues
-  settings:
-    errcheck:
-      check-blank: true
+    - asasalint
+    - asciicheck
+    - contextcheck
+    - dogsled
+    - errcheck
+    - dupl
+    - dupword
+    - misspell
+  disable:
+    - gochecknoglobals
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+issues:
+  max-same-issues: 0
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
