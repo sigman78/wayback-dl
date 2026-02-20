@@ -49,10 +49,10 @@ func TestEnsureLocalTarget(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"", "index.html"},             // empty → root index
-		{"dir/", "dir/index.html"},     // trailing slash
-		{"page", "page/index.html"},    // no extension → treated as directory
-		{"style.css", "style.css"},     // has extension → unchanged
+		{"", "index.html"},          // empty → root index
+		{"dir/", "dir/index.html"},  // trailing slash
+		{"page", "page/index.html"}, // no extension → treated as directory
+		{"style.css", "style.css"},  // has extension → unchanged
 		{"img/photo.jpg", "img/photo.jpg"},
 	}
 
