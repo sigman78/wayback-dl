@@ -123,10 +123,6 @@ func fetchAllSnapshots(variants []string, exactURL bool, fromTS, toTS string) ([
 						all = append(all, e)
 					}
 				}
-				// If fewer results came back than a full page we are done
-				if len(entries) < 100 {
-					break
-				}
 			}
 		}
 	}
