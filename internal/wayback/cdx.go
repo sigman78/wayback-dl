@@ -87,7 +87,8 @@ func fetchCDXPage(baseURL string, pageIndex int, fromTS, toTS string) ([]CDXEntr
 
 // fetchAllSnapshots collects every CDX entry for all URL variants.
 // When exactURL is false it appends /* for wildcard and paginates.
-func fetchAllSnapshots(variants []string, exactURL bool, fromTS, toTS string) ([]CDXEntry, error) {
+// prog is advanced by one step for each CDX page successfully fetched.
+func fetchAllSnapshots(variants []string, exactURL bool, fromTS, toTS string, prog *Progress) ([]CDXEntry, error) {
 	seen := make(map[string]bool)
 	var all []CDXEntry
 
@@ -97,6 +98,7 @@ func fetchAllSnapshots(variants []string, exactURL bool, fromTS, toTS string) ([
 			if err != nil {
 				return nil, err
 			}
+			prog.Inc()
 			for _, e := range entries {
 				key := e.Timestamp + "|" + e.OriginalURL
 				if !seen[key] {
@@ -113,6 +115,7 @@ func fetchAllSnapshots(variants []string, exactURL bool, fromTS, toTS string) ([
 					// On error stop paginating this variant
 					break
 				}
+				prog.Inc()
 				if len(entries) == 0 {
 					break
 				}

@@ -41,7 +41,9 @@ var downloadHTTPClient = &http.Client{
 
 // DownloadAll fetches the CDX index and downloads every snapshot concurrently.
 func DownloadAll(cfg *Config) error {
-	entries, err := fetchAllSnapshots(cfg.Variants, cfg.ExactURL, cfg.FromTimestamp, cfg.ToTimestamp)
+	cdxProg := NewCDXProgress()
+	entries, err := fetchAllSnapshots(cfg.Variants, cfg.ExactURL, cfg.FromTimestamp, cfg.ToTimestamp, cdxProg)
+	cdxProg.Finish()
 	if err != nil {
 		return fmt.Errorf("CDX fetch: %w", err)
 	}
@@ -71,7 +73,8 @@ func DownloadAll(cfg *Config) error {
 	defer pool.Release()
 
 	g, ctx := errgroup.WithContext(context.Background())
-	var processed, failed atomic.Int32
+	dlProg := NewDownloadProgress(total)
+	var failed atomic.Int32
 
 	for _, snap := range manifest {
 		s := snap
@@ -81,7 +84,7 @@ func DownloadAll(cfg *Config) error {
 			}
 			errCh := make(chan error, 1)
 			if err := pool.Submit(func() {
-				errCh <- downloadOne(ctx, s, cfg, idx, &processed, total)
+				errCh <- downloadOne(ctx, s, cfg, idx, dlProg)
 			}); err != nil {
 				return fmt.Errorf("submit task: %w", err)
 			}
@@ -101,6 +104,7 @@ func DownloadAll(cfg *Config) error {
 	if err := g.Wait(); err != nil {
 		return err
 	}
+	dlProg.Finish()
 	if n := failed.Load(); n > 0 {
 		fmt.Printf("%d resource(s) failed to download.\n", n)
 	}
@@ -108,8 +112,7 @@ func DownloadAll(cfg *Config) error {
 }
 
 // downloadOne downloads a single snapshot and optionally rewrites its links.
-func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotIndex,
-	processed *atomic.Int32, total int) error {
+func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotIndex, dlProg *Progress) error {
 
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -120,7 +123,7 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 
 	// Skip existing files
 	if _, err := os.Stat(localPath); err == nil {
-		RenderProgress(int(processed.Add(1)), total)
+		dlProg.Inc()
 		return nil
 	}
 
@@ -143,7 +146,7 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Skip 404s gracefully
-		RenderProgress(int(processed.Add(1)), total)
+		dlProg.Inc()
 		return nil
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -201,7 +204,7 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 		}
 	}
 
-	RenderProgress(int(processed.Add(1)), total)
+	dlProg.Inc()
 	return nil
 }
 
