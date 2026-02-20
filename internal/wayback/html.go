@@ -135,7 +135,7 @@ func rewriteAttr(n *html.Node, attr string, pageU *url.URL, localDir string,
 		}
 
 		// Build local file path for the resolved URL
-		localTarget := URLToLocalPath(resolved.String())
+		localTarget := URLToLocalPath(resolved.String(), cfg.PrettyPath)
 		localTarget = filepath.Join(cfg.Directory, filepath.FromSlash(localTarget))
 		localTarget = ToPosix(localTarget)
 

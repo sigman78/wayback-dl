@@ -25,7 +25,7 @@ func RewriteCSSContent(css, pageURL string, cfg *Config, idx *SnapshotIndex) str
 	}
 
 	// Compute local directory of the page file for RelativeLink
-	localPath := URLToLocalPath(pageURL)
+	localPath := URLToLocalPath(pageURL, cfg.PrettyPath)
 	localPath = filepath.Join(cfg.Directory, filepath.FromSlash(localPath))
 	localDir := ToPosix(filepath.ToSlash(filepath.Dir(localPath)))
 
@@ -54,7 +54,7 @@ func RewriteCSSContent(css, pageURL string, cfg *Config, idx *SnapshotIndex) str
 			return src
 		}
 
-		localTarget := URLToLocalPath(resolved.String())
+		localTarget := URLToLocalPath(resolved.String(), cfg.PrettyPath)
 		localTarget = filepath.Join(cfg.Directory, filepath.FromSlash(localTarget))
 		localTarget = ToPosix(localTarget)
 

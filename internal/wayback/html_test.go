@@ -86,9 +86,24 @@ func TestProcessHTMLLinkStylesheet(t *testing.T) {
 	}
 }
 
-// <form action> must be rewritten.
+// <form action> must be rewritten (preserve mode: extension-less → plain file).
 func TestProcessHTMLFormAction(t *testing.T) {
+	cfg := testHTMLCfg() // PrettyPath defaults to false
+	in := `<html><body><form action="http://example.com/submit"></form></body></html>`
+	out := processHTMLInTemp(t, in, "http://example.com/", cfg)
+
+	if strings.Contains(out, "http://example.com") {
+		t.Errorf("form action not rewritten\n  got: %s", out)
+	}
+	if !strings.Contains(out, `action="submit"`) {
+		t.Errorf("expected relative form action\n  got: %s", out)
+	}
+}
+
+// <form action> in pretty mode: extension-less → dir/index.html.
+func TestProcessHTMLFormActionPretty(t *testing.T) {
 	cfg := testHTMLCfg()
+	cfg.PrettyPath = true
 	in := `<html><body><form action="http://example.com/submit"></form></body></html>`
 	out := processHTMLInTemp(t, in, "http://example.com/", cfg)
 
@@ -96,7 +111,7 @@ func TestProcessHTMLFormAction(t *testing.T) {
 		t.Errorf("form action not rewritten\n  got: %s", out)
 	}
 	if !strings.Contains(out, `action="submit/index.html"`) {
-		t.Errorf("expected relative form action\n  got: %s", out)
+		t.Errorf("expected pretty relative form action\n  got: %s", out)
 	}
 }
 
