@@ -168,31 +168,20 @@ func WindowsSanitize(p string) string {
 
 // URLToLocalPath converts an absolute URL to a relative filesystem path fragment
 // (no leading slash) suitable for joining with the output directory.
+// The output directory already encodes the domain, so only the path is used.
 func URLToLocalPath(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return "unknown"
 	}
 
-	// Use Hostname() (no port) and strip default ports to keep directory names clean.
-	host := u.Hostname()
-	port := u.Port()
-	switch {
-	case port == "80" && u.Scheme == "http":
-		// default HTTP port — omit
-	case port == "443" && u.Scheme == "https":
-		// default HTTPS port — omit
-	case port != "":
-		// non-default port: append with encoded colon so Windows stays happy
-		host = host + "%3A" + port
-	}
-
-	p := host + u.Path
+	// Use only the path — the output directory already encodes the domain.
+	p := strings.TrimLeft(u.Path, "/")
+	p = strings.ReplaceAll(p, "//", "/")
+	p = EnsureLocalTarget(p)        // call BEFORE appending query
 	if u.RawQuery != "" {
 		p += "?" + u.RawQuery
 	}
-	p = strings.ReplaceAll(p, "//", "/")
-	p = EnsureLocalTarget(p)
 	p = WindowsSanitize(p)
 	return p
 }
