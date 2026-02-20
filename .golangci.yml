@@ -25,14 +25,5 @@ linters:
   disable:
     - gochecknoglobals
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-
 issues:
   max-same-issues: 0
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
