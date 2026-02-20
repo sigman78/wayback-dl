@@ -1,6 +1,7 @@
 package wayback
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -8,9 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/panjf2000/ants/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 // Config holds all runtime configuration for the downloader.
@@ -28,6 +31,7 @@ type Config struct {
 	CanonicalAction        string
 	DownloadExternalAssets bool
 	Debug                  bool
+	StopOnError            bool
 }
 
 var downloadHTTPClient = &http.Client{
@@ -59,39 +63,63 @@ func DownloadAll(cfg *Config) error {
 		return fmt.Errorf("create output dir: %w", err)
 	}
 
-	sem := make(chan struct{}, cfg.Threads)
-	var wg sync.WaitGroup
-	var processed int32
-	var mu sync.Mutex
+	pool, err := ants.NewPool(cfg.Threads)
+	if err != nil {
+		return fmt.Errorf("create worker pool: %w", err)
+	}
+	defer pool.Release()
+
+	g, ctx := errgroup.WithContext(context.Background())
+	var processed, failed atomic.Int32
 
 	for _, snap := range manifest {
-		wg.Add(1)
-		go func(s Snapshot) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			if err := downloadOne(s, cfg, idx, &mu, &processed, total); err != nil {
+		s := snap
+		g.Go(func() error {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			errCh := make(chan error, 1)
+			if err := pool.Submit(func() {
+				errCh <- downloadOne(ctx, s, cfg, idx, &processed, total)
+			}); err != nil {
+				return fmt.Errorf("submit task: %w", err)
+			}
+			if err := <-errCh; err != nil {
+				if cfg.StopOnError {
+					return err
+				}
+				failed.Add(1)
 				if cfg.Debug {
 					log.Printf("download error %s: %v", s.FileURL, err)
 				}
 			}
-		}(snap)
+			return nil
+		})
 	}
-	wg.Wait()
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	if n := failed.Load(); n > 0 {
+		fmt.Printf("%d resource(s) failed to download.\n", n)
+	}
 	return nil
 }
 
 // downloadOne downloads a single snapshot and optionally rewrites its links.
-func downloadOne(snap Snapshot, cfg *Config, idx *SnapshotIndex,
-	mu *sync.Mutex, processed *int32, total int) error {
+func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotIndex,
+	processed *atomic.Int32, total int) error {
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 
 	localPath := URLToLocalPath(snap.FileURL)
 	localPath = filepath.Join(cfg.Directory, filepath.FromSlash(localPath))
 
 	// Skip existing files
 	if _, err := os.Stat(localPath); err == nil {
-		n := atomic.AddInt32(processed, 1)
-		RenderProgress(int(n), total)
+		RenderProgress(int(processed.Add(1)), total)
 		return nil
 	}
 
@@ -102,7 +130,11 @@ func downloadOne(snap Snapshot, cfg *Config, idx *SnapshotIndex,
 		log.Printf("GET %s", waybackURL)
 	}
 
-	resp, err := downloadHTTPClient.Get(waybackURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, waybackURL, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	resp, err := downloadHTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("http get: %w", err)
 	}
@@ -110,8 +142,7 @@ func downloadOne(snap Snapshot, cfg *Config, idx *SnapshotIndex,
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Skip 404s gracefully
-		n := atomic.AddInt32(processed, 1)
-		RenderProgress(int(n), total)
+		RenderProgress(int(processed.Add(1)), total)
 		return nil
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -169,9 +200,7 @@ func downloadOne(snap Snapshot, cfg *Config, idx *SnapshotIndex,
 		}
 	}
 
-	cnt := atomic.AddInt32(processed, 1)
-	_ = mu // mu kept for potential future terminal writes outside RenderProgress
-	RenderProgress(int(cnt), total)
+	RenderProgress(int(processed.Add(1)), total)
 	return nil
 }
 

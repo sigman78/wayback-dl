@@ -17,7 +17,7 @@ cd wayback-dl
 make build
 ```
 
-Requires Go 1.21+.
+Requires Go 1.24+.
 
 ---
 
