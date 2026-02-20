@@ -37,7 +37,7 @@ func ProcessHTML(filePath, pageURL string, cfg *Config, idx *SnapshotIndex) erro
 			case "a", "form":
 				rewriteAttr(n, attrName(n.Data), pageU, localDir, cfg, idx, false)
 
-			case "img", "script", "iframe", "source":
+			case "img", "script", "iframe", "source", "video", "audio":
 				rewriteAttr(n, "src", pageU, localDir, cfg, idx, true)
 
 			case "link":
