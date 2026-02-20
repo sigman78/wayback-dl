@@ -1,0 +1,13 @@
+# Compiled binary
+wayback-dl
+wayback-dl.exe
+
+# Download output
+websites/
+
+# Go build cache artifacts
+*.test
+*.out
+
+# goreleaser output
+dist/
