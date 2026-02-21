@@ -2,7 +2,6 @@ package wayback
 
 import (
 	"net/url"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -92,12 +91,12 @@ func RewriteCSSContent(css, pageURL string, cfg *Config, idx *SnapshotIndex) str
 	return css
 }
 
-// RewriteCSSFile reads a CSS file, rewrites its URLs, and writes it back.
-func RewriteCSSFile(filePath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
-	data, err := os.ReadFile(filePath) //nolint:gosec // G304: path is written by this program
+// RewriteCSSFile reads a CSS file from storage, rewrites its URLs, and writes it back.
+func RewriteCSSFile(store Storage, logicalPath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
+	data, err := store.Get(logicalPath)
 	if err != nil {
 		return err
 	}
 	rewritten := RewriteCSSContent(string(data), pageURL, cfg, idx)
-	return os.WriteFile(filePath, []byte(rewritten), 0600)
+	return store.PutBytes(logicalPath, []byte(rewritten))
 }
