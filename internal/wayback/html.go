@@ -165,6 +165,9 @@ func rewriteAttr(n *html.Node, attr string, pageU *url.URL, localDir string,
 		localTarget = ToPosix(localTarget)
 
 		rel := RelativeLink(localDir, localTarget)
+		// Literal % in the filesystem path (e.g. %3F for ?) must be re-encoded
+		// so browsers decode the href to the actual on-disk filename.
+		rel = strings.ReplaceAll(rel, "%", "%25")
 		n.Attr[i].Val = rel
 		return
 	}

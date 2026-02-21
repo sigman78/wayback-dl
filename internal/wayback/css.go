@@ -59,6 +59,7 @@ func RewriteCSSContent(css, pageURL string, cfg *Config, idx *SnapshotIndex) str
 		localTarget = ToPosix(localTarget)
 
 		rel := RelativeLink(localDir, localTarget)
+		rel = strings.ReplaceAll(rel, "%", "%25")
 		return strings.Replace(src, ref, rel, 1)
 	}
 

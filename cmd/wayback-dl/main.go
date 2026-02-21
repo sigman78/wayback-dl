@@ -22,7 +22,7 @@ Options:
   -threads int            Concurrent download threads (default: 3)
   -directory string       Output directory (default: websites/<host>/)
   -rewrite-links          Rewrite page links to relative paths
-  -prettyPath             Map extension-less URLs to dir/index.html (default: preserve original path)
+  -pretty-path            Map extension-less URLs to dir/index.html (default: preserve original path)
   -canonical string       Canonical tag handling: keep|remove (default: keep)
   -exact-url              Download only the exact URL, no wildcard /*
   -external-assets        Also download off-site (external) assets
@@ -64,7 +64,7 @@ func main() {
 	fs.IntVar(&threadsFlag, "threads", 3, "Concurrent download threads")
 	fs.StringVar(&dirFlag, "directory", "", "Output directory")
 	fs.BoolVar(&rewriteLinks, "rewrite-links", false, "Rewrite page links to relative paths")
-	fs.BoolVar(&prettyPath, "prettyPath", false, "Prettify paths: map extension-less URLs to dir/index.html")
+	fs.BoolVar(&prettyPath, "pretty-path", false, "Prettify paths: map extension-less URLs to dir/index.html")
 	fs.StringVar(&canonical, "canonical", "keep", "Canonical tag handling: keep|remove")
 	fs.BoolVar(&exactURL, "exact-url", false, "Download only the exact URL, no wildcard /*")
 	fs.BoolVar(&extAssets, "external-assets", false, "Also download off-site (external) assets")
