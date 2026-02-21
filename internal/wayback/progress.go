@@ -55,6 +55,13 @@ func (p *Progress) Inc() {
 	_ = p.bar.Add(1)
 }
 
+func (p *Progress) SetMax(num int) {
+	if p == nil {
+		return
+	}
+	p.bar.ChangeMax(num)
+}
+
 // Finish marks the bar as complete and moves to a new line.
 func (p *Progress) Finish() {
 	if p == nil {

@@ -33,6 +33,8 @@ type Config struct {
 	DownloadExternalAssets bool
 	Debug                  bool
 	StopOnError            bool
+	CDXRatePerMin          int // CDX API requests per minute (default 60)
+	CDXMaxRetries          int // max retry attempts on throttle/5xx (default 5)
 }
 
 var downloadHTTPClient = &http.Client{
@@ -41,8 +43,11 @@ var downloadHTTPClient = &http.Client{
 
 // DownloadAll fetches the CDX index and downloads every snapshot concurrently.
 func DownloadAll(cfg *Config) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	cdxProg := NewCDXProgress()
-	entries, err := fetchAllSnapshots(cfg.Variants, cfg.ExactURL, cfg.FromTimestamp, cfg.ToTimestamp, cdxProg)
+	entries, err := fetchAllSnapshots(ctx, cfg.Variants, cfg.ExactURL, cfg.FromTimestamp, cfg.ToTimestamp, cdxProg, cfg.CDXRatePerMin, cfg.CDXMaxRetries)
 	cdxProg.Finish()
 	if err != nil {
 		return fmt.Errorf("CDX fetch: %w", err)
@@ -60,7 +65,9 @@ func DownloadAll(cfg *Config) error {
 
 	manifest := idx.GetManifest()
 	total := len(manifest)
-	fmt.Printf("Found %d unique snapshots to download.\n", total)
+	if cfg.Debug {
+		fmt.Printf("Found %d unique snapshots to download.\n", total)
+	}
 
 	if err := os.MkdirAll(cfg.Directory, 0750); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
@@ -72,7 +79,7 @@ func DownloadAll(cfg *Config) error {
 	}
 	defer pool.Release()
 
-	g, ctx := errgroup.WithContext(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
 	dlProg := NewDownloadProgress(total)
 	var failed atomic.Int32
 

@@ -27,6 +27,8 @@ Options:
   -exact-url              Download only the exact URL, no wildcard /*
   -external-assets        Also download off-site (external) assets
   -stop-on-error          Stop immediately on first download error (default: continue)
+  -cdx-rate int           CDX API requests per minute (default: 60)
+  -cdx-retries int        Max retries on CDX throttle or 5xx (default: 5)
   -debug                  Enable verbose debug logging
   -version                Print version and exit
   -h / -help              Show this help and exit
@@ -51,6 +53,8 @@ func main() {
 		exactURL     bool
 		extAssets    bool
 		stopOnError  bool
+		cdxRate      int
+		cdxRetries   int
 		debug        bool
 	)
 
@@ -65,6 +69,8 @@ func main() {
 	fs.BoolVar(&exactURL, "exact-url", false, "Download only the exact URL, no wildcard /*")
 	fs.BoolVar(&extAssets, "external-assets", false, "Also download off-site (external) assets")
 	fs.BoolVar(&stopOnError, "stop-on-error", false, "Stop immediately on first download error")
+	fs.IntVar(&cdxRate, "cdx-rate", 60, "CDX API requests per minute")
+	fs.IntVar(&cdxRetries, "cdx-retries", 5, "Max retries on CDX throttle or 5xx")
 	fs.BoolVar(&debug, "debug", false, "Enable verbose debug logging")
 
 	// Handle -version / -h / -help before the flag parser so we control the exit code.
@@ -142,6 +148,8 @@ func main() {
 		CanonicalAction:        canonical,
 		DownloadExternalAssets: extAssets,
 		StopOnError:            stopOnError,
+		CDXRatePerMin:          cdxRate,
+		CDXMaxRetries:          cdxRetries,
 		Debug:                  debug,
 	}
 
