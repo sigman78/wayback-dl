@@ -36,10 +36,15 @@ Options:
   -threads int            Concurrent download threads (default: 3)
   -directory string       Output directory (default: websites/<host>/)
   -rewrite-links          Rewrite page links to relative paths
+  -pretty-path            Map extension-less URLs to dir/index.html (default: preserve original path)
   -canonical string       Canonical tag handling: keep|remove (default: keep)
   -exact-url              Download only the exact URL, no wildcard /*
   -external-assets        Also download off-site (external) assets
+  -stop-on-error          Stop immediately on first download error (default: continue)
+  -cdx-rate int           CDX API requests per minute (default: 60)
+  -cdx-retries int        Max retries on CDX throttle or 5xx (default: 5)
   -debug                  Enable verbose debug logging
+  -version                Print version and exit
   -h / -help              Show this help and exit
 ```
 
@@ -110,7 +115,7 @@ make build
 
 ---
 
-## Development
+## Development 
 
 ```sh
 # Install tooling (one-time)

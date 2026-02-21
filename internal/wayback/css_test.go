@@ -87,3 +87,39 @@ func TestRewriteCSSDataURIUntouched(t *testing.T) {
 		t.Errorf("data: URI should be left unchanged\n  got: %s", got)
 	}
 }
+
+// url() with query string — non-pretty mode.
+func TestRewriteCSSURLQueryRaw(t *testing.T) {
+	cfg := testCSSCfg() // PrettyPath = false
+	idx := NewSnapshotIndex()
+
+	css := `body { background: url("http://example.com/images/bg.png?fbc4e9ea"); }`
+	got := RewriteCSSContent(css, "http://example.com/style.css", cfg, idx)
+
+	if strings.Contains(got, "http://example.com") {
+		t.Errorf("absolute URL should have been removed\n  got: %s", got)
+	}
+	if strings.Contains(got, "bg.png?") {
+		t.Errorf("raw query should have been rewritten\n  got: %s", got)
+	}
+	if !strings.Contains(got, "bg.png%253Ffbc4e9ea") {
+		t.Errorf("expected %%253F-encoded local path\n  got: %s", got)
+	}
+}
+
+// url() with query string — pretty mode: query embedded cleanly in filename.
+func TestRewriteCSSURLQueryPretty(t *testing.T) {
+	cfg := testCSSCfg()
+	cfg.PrettyPath = true
+	idx := NewSnapshotIndex()
+
+	css := `body { background: url("http://example.com/images/bg.png?fbc4e9ea"); }`
+	got := RewriteCSSContent(css, "http://example.com/style.css", cfg, idx)
+
+	if strings.Contains(got, "http://example.com") {
+		t.Errorf("absolute URL should have been removed\n  got: %s", got)
+	}
+	if !strings.Contains(got, "bg_fbc4e9ea.png") {
+		t.Errorf("expected pretty local path with query suffix\n  got: %s", got)
+	}
+}

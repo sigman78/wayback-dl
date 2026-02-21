@@ -165,6 +165,67 @@ func TestProcessHTMLSpecialSchemesUntouched(t *testing.T) {
 	}
 }
 
+// <link href> with cache-busting query — non-pretty mode.
+// Local file is style.css%3FHASH; href must use %253F so browsers
+// decode once to %3F and find the file.
+func TestProcessHTMLLinkQueryRaw(t *testing.T) {
+	cfg := testHTMLCfg() // PrettyPath = false
+	in := `<html><head><link rel="stylesheet" href="style.css?fbc4e9ea0c35466f02ad5a4e811ec7ae"/></head><body></body></html>`
+	out := processHTMLInTemp(t, in, "http://example.com/", cfg)
+
+	if strings.Contains(out, "style.css?") {
+		t.Errorf("raw query URL should have been rewritten\n  got: %s", out)
+	}
+	if !strings.Contains(out, `href="style.css%253Ffbc4e9ea0c35466f02ad5a4e811ec7ae"`) {
+		t.Errorf("expected %%253F-encoded local path\n  got: %s", out)
+	}
+}
+
+// <script src> with cache-busting query — non-pretty mode.
+func TestProcessHTMLScriptQueryRaw(t *testing.T) {
+	cfg := testHTMLCfg()
+	in := `<html><head><script src="main.js?f6d367ed67e79dca2aae2cc22f551a87"></script></head><body></body></html>`
+	out := processHTMLInTemp(t, in, "http://example.com/", cfg)
+
+	if strings.Contains(out, "main.js?") {
+		t.Errorf("raw query URL should have been rewritten\n  got: %s", out)
+	}
+	if !strings.Contains(out, `src="main.js%253Ff6d367ed67e79dca2aae2cc22f551a87"`) {
+		t.Errorf("expected %%253F-encoded local path\n  got: %s", out)
+	}
+}
+
+// <link href> with cache-busting query — pretty mode.
+// URLToLocalPath embeds query cleanly: style_HASH.css (no %).
+func TestProcessHTMLLinkQueryPretty(t *testing.T) {
+	cfg := testHTMLCfg()
+	cfg.PrettyPath = true
+	in := `<html><head><link rel="stylesheet" href="style.css?fbc4e9ea0c35466f02ad5a4e811ec7ae"/></head><body></body></html>`
+	out := processHTMLInTemp(t, in, "http://example.com/", cfg)
+
+	if strings.Contains(out, "style.css?") {
+		t.Errorf("raw query URL should have been rewritten\n  got: %s", out)
+	}
+	if !strings.Contains(out, `href="style_fbc4e9ea0c35466f02ad5a4e811ec7ae.css"`) {
+		t.Errorf("expected pretty local path\n  got: %s", out)
+	}
+}
+
+// <script src> with cache-busting query — pretty mode.
+func TestProcessHTMLScriptQueryPretty(t *testing.T) {
+	cfg := testHTMLCfg()
+	cfg.PrettyPath = true
+	in := `<html><head><script src="main.js?f6d367ed67e79dca2aae2cc22f551a87"></script></head><body></body></html>`
+	out := processHTMLInTemp(t, in, "http://example.com/", cfg)
+
+	if strings.Contains(out, "main.js?") {
+		t.Errorf("raw query URL should have been rewritten\n  got: %s", out)
+	}
+	if !strings.Contains(out, `src="main_f6d367ed67e79dca2aae2cc22f551a87.js"`) {
+		t.Errorf("expected pretty local path\n  got: %s", out)
+	}
+}
+
 // Inline style attributes must have their url() references rewritten.
 func TestProcessHTMLInlineStyleRewritten(t *testing.T) {
 	cfg := testHTMLCfg()
