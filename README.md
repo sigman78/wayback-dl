@@ -9,12 +9,10 @@ Go adaptation of [wayback-machine-downloader](https://github.com/birbwatcher/way
 
 ## Install
 
-Download release or build from source:
+Download release or Go native install:
 
 ```sh
-git clone ...
-cd wayback-dl
-make build
+go install github.com/sigman78/wayback-dl/cmd/wayback-dl@latest
 ```
 
 Requires Go 1.24+.
