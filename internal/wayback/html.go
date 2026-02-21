@@ -9,8 +9,10 @@ import (
 	"golang.org/x/net/html"
 )
 
-// ProcessHTML rewrites links and canonical tags in an HTML file.
-func ProcessHTML(store Storage, logicalPath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
+// HTMLRewriter implements Rewriter for HTML resources.
+type HTMLRewriter struct{}
+
+func (HTMLRewriter) Rewrite(store Storage, logicalPath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
 	data, err := store.Get(logicalPath)
 	if err != nil {
 		return err

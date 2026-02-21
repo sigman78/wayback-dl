@@ -91,8 +91,10 @@ func RewriteCSSContent(css, pageURL string, cfg *Config, idx *SnapshotIndex) str
 	return css
 }
 
-// RewriteCSSFile reads a CSS file from storage, rewrites its URLs, and writes it back.
-func RewriteCSSFile(store Storage, logicalPath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
+// CSSRewriter implements Rewriter for CSS resources.
+type CSSRewriter struct{}
+
+func (CSSRewriter) Rewrite(store Storage, logicalPath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
 	data, err := store.Get(logicalPath)
 	if err != nil {
 		return err

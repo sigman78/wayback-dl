@@ -15,8 +15,8 @@ func processHTMLInTemp(t *testing.T, htmlContent, pageURL string, cfg *Config) s
 	}
 
 	idx := NewSnapshotIndex()
-	if err := ProcessHTML(store, "test.html", pageURL, cfg, idx); err != nil {
-		t.Fatalf("ProcessHTML: %v", err)
+	if err := (HTMLRewriter{}).Rewrite(store, "test.html", pageURL, cfg, idx); err != nil {
+		t.Fatalf("HTMLRewriter.Rewrite: %v", err)
 	}
 
 	got, err := store.Get("test.html")
