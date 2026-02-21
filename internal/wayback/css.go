@@ -2,6 +2,7 @@ package wayback
 
 import (
 	"net/url"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -93,6 +94,15 @@ func RewriteCSSContent(css, pageURL string, cfg *Config, idx *SnapshotIndex) str
 
 // CSSRewriter implements Rewriter for CSS resources.
 type CSSRewriter struct{}
+
+// Match reports whether this resource should be treated as CSS.
+// Checks Content-Type and file extension (.css).
+func (CSSRewriter) Match(logicalPath, contentType string, firstBytes []byte) bool {
+	if strings.Contains(strings.ToLower(contentType), "text/css") {
+		return true
+	}
+	return strings.ToLower(path.Ext(logicalPath)) == ".css"
+}
 
 func (CSSRewriter) Rewrite(store Storage, logicalPath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
 	data, err := store.Get(logicalPath)

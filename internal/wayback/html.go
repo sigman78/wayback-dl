@@ -3,6 +3,7 @@ package wayback
 import (
 	"bytes"
 	"net/url"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -11,6 +12,29 @@ import (
 
 // HTMLRewriter implements Rewriter for HTML resources.
 type HTMLRewriter struct{}
+
+// Match reports whether this resource should be treated as HTML.
+// Checks Content-Type, file extension (.html/.htm), then magic bytes.
+func (HTMLRewriter) Match(logicalPath, contentType string, firstBytes []byte) bool {
+	ct := strings.ToLower(contentType)
+	if strings.Contains(ct, "text/html") {
+		return true
+	}
+	ext := strings.ToLower(path.Ext(logicalPath))
+	if ext == ".html" || ext == ".htm" {
+		return true
+	}
+	if len(firstBytes) > 0 {
+		b := firstBytes
+		if len(b) >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF {
+			b = b[3:]
+		}
+		if strings.HasPrefix(strings.TrimSpace(string(b)), "<") {
+			return true
+		}
+	}
+	return false
+}
 
 func (HTMLRewriter) Rewrite(store Storage, logicalPath, pageURL string, cfg *Config, idx *SnapshotIndex) error {
 	data, err := store.Get(logicalPath)
