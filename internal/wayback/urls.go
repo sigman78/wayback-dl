@@ -87,39 +87,6 @@ func NormalizeBaseURL(input string) (*NormalizedBase, error) {
 	}, nil
 }
 
-// IsHTMLFile returns true when the path/content-type/magic bytes indicate HTML.
-func IsHTMLFile(filePath, contentType string, firstBytes []byte) bool {
-	ct := strings.ToLower(contentType)
-	if strings.Contains(ct, "text/html") {
-		return true
-	}
-	ext := strings.ToLower(path.Ext(filePath))
-	if ext == ".html" || ext == ".htm" {
-		return true
-	}
-	// magic: look for a leading BOM or <
-	if len(firstBytes) > 0 {
-		b := firstBytes
-		// skip BOM
-		if len(b) >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF {
-			b = b[3:]
-		}
-		trimmed := strings.TrimSpace(string(b))
-		if strings.HasPrefix(trimmed, "<") {
-			return true
-		}
-	}
-	return false
-}
-
-// IsCSSResource returns true when the path/content-type indicates CSS.
-func IsCSSResource(filePath, contentType string) bool {
-	if strings.Contains(strings.ToLower(contentType), "text/css") {
-		return true
-	}
-	return strings.ToLower(path.Ext(filePath)) == ".css"
-}
-
 // RelativeLink returns the relative path from fromDir to toFile.
 func RelativeLink(fromDir, toFile string) string {
 	rel, err := filepath.Rel(filepath.FromSlash(fromDir), filepath.FromSlash(toFile))

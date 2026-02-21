@@ -171,16 +171,9 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, store Storage,
 
 	// Post-process HTML / CSS
 	if cfg.RewriteLinks {
-		ct := resp.Header.Get("Content-Type")
-		fileURL := snap.FileURL
-
-		if IsHTMLFile(logicalPath, ct, first) {
-			if err := ProcessHTML(store, logicalPath, fileURL, cfg, idx); err != nil && cfg.Debug {
-				log.Printf("html rewrite %s: %v", logicalPath, err)
-			}
-		} else if IsCSSResource(logicalPath, ct) {
-			if err := RewriteCSSFile(store, logicalPath, fileURL, cfg, idx); err != nil && cfg.Debug {
-				log.Printf("css rewrite %s: %v", logicalPath, err)
+		if rw := DetectRewriter(logicalPath, resp.Header.Get("Content-Type"), first); rw != nil {
+			if err := rw.Rewrite(store, logicalPath, snap.FileURL, cfg, idx); err != nil && cfg.Debug {
+				log.Printf("rewrite %s: %v", logicalPath, err)
 			}
 		}
 	}
