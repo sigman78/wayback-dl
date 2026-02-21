@@ -33,6 +33,8 @@ type Config struct {
 	DownloadExternalAssets bool
 	Debug                  bool
 	StopOnError            bool
+	CDXRatePerMin          int // CDX API requests per minute (default 60)
+	CDXMaxRetries          int // max retry attempts on throttle/5xx (default 5)
 }
 
 var downloadHTTPClient = &http.Client{
@@ -41,7 +43,12 @@ var downloadHTTPClient = &http.Client{
 
 // DownloadAll fetches the CDX index and downloads every snapshot concurrently.
 func DownloadAll(cfg *Config) error {
-	entries, err := fetchAllSnapshots(cfg.Variants, cfg.ExactURL, cfg.FromTimestamp, cfg.ToTimestamp)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cdxProg := NewCDXProgress()
+	entries, err := fetchAllSnapshots(ctx, cfg.Variants, cfg.ExactURL, cfg.FromTimestamp, cfg.ToTimestamp, cdxProg, cfg.CDXRatePerMin, cfg.CDXMaxRetries)
+	cdxProg.Finish()
 	if err != nil {
 		return fmt.Errorf("CDX fetch: %w", err)
 	}
@@ -58,7 +65,9 @@ func DownloadAll(cfg *Config) error {
 
 	manifest := idx.GetManifest()
 	total := len(manifest)
-	fmt.Printf("Found %d unique snapshots to download.\n", total)
+	if cfg.Debug {
+		fmt.Printf("Found %d unique snapshots to download.\n", total)
+	}
 
 	if err := os.MkdirAll(cfg.Directory, 0750); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
@@ -70,8 +79,9 @@ func DownloadAll(cfg *Config) error {
 	}
 	defer pool.Release()
 
-	g, ctx := errgroup.WithContext(context.Background())
-	var processed, failed atomic.Int32
+	g, ctx := errgroup.WithContext(ctx)
+	dlProg := NewDownloadProgress(total)
+	var failed atomic.Int32
 
 	for _, snap := range manifest {
 		s := snap
@@ -81,7 +91,7 @@ func DownloadAll(cfg *Config) error {
 			}
 			errCh := make(chan error, 1)
 			if err := pool.Submit(func() {
-				errCh <- downloadOne(ctx, s, cfg, idx, &processed, total)
+				errCh <- downloadOne(ctx, s, cfg, idx, dlProg)
 			}); err != nil {
 				return fmt.Errorf("submit task: %w", err)
 			}
@@ -101,6 +111,7 @@ func DownloadAll(cfg *Config) error {
 	if err := g.Wait(); err != nil {
 		return err
 	}
+	dlProg.Finish()
 	if n := failed.Load(); n > 0 {
 		fmt.Printf("%d resource(s) failed to download.\n", n)
 	}
@@ -108,8 +119,7 @@ func DownloadAll(cfg *Config) error {
 }
 
 // downloadOne downloads a single snapshot and optionally rewrites its links.
-func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotIndex,
-	processed *atomic.Int32, total int) error {
+func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotIndex, dlProg *Progress) error {
 
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -120,7 +130,7 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 
 	// Skip existing files
 	if _, err := os.Stat(localPath); err == nil {
-		RenderProgress(int(processed.Add(1)), total)
+		dlProg.Inc()
 		return nil
 	}
 
@@ -143,7 +153,7 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Skip 404s gracefully
-		RenderProgress(int(processed.Add(1)), total)
+		dlProg.Inc()
 		return nil
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -201,7 +211,7 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 		}
 	}
 
-	RenderProgress(int(processed.Add(1)), total)
+	dlProg.Inc()
 	return nil
 }
 
