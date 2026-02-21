@@ -1,35 +1,29 @@
 package wayback
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// processHTMLInTemp writes htmlContent to a temp file at <dir>/index.html,
-// sets cfg.Directory = dir so that relative-link math is consistent, then
-// runs ProcessHTML and returns the rewritten file contents.
+// processHTMLInTemp writes htmlContent into a LocalStorage backed by a temp
+// directory, runs ProcessHTML, and returns the rewritten file contents.
 func processHTMLInTemp(t *testing.T, htmlContent, pageURL string, cfg *Config) string {
 	t.Helper()
-	dir := t.TempDir()
-	cfg.Directory = dir
-
-	filePath := filepath.Join(dir, "index.html")
-	if err := os.WriteFile(filePath, []byte(htmlContent), 0600); err != nil {
+	store := NewLocalStorage(t.TempDir())
+	if err := store.PutBytes("test.html", []byte(htmlContent)); err != nil {
 		t.Fatalf("write test HTML: %v", err)
 	}
 
 	idx := NewSnapshotIndex()
-	if err := ProcessHTML(filePath, pageURL, cfg, idx); err != nil {
+	if err := ProcessHTML(store, "test.html", pageURL, cfg, idx); err != nil {
 		t.Fatalf("ProcessHTML: %v", err)
 	}
 
-	out, err := os.ReadFile(filePath)
+	got, err := store.Get("test.html")
 	if err != nil {
 		t.Fatalf("read result: %v", err)
 	}
-	return string(out)
+	return string(got)
 }
 
 func testHTMLCfg() *Config {

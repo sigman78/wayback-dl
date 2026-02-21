@@ -1,13 +1,12 @@
 package wayback
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -33,8 +32,9 @@ type Config struct {
 	DownloadExternalAssets bool
 	Debug                  bool
 	StopOnError            bool
-	CDXRatePerMin          int // CDX API requests per minute (default 60)
-	CDXMaxRetries          int // max retry attempts on throttle/5xx (default 5)
+	CDXRatePerMin          int     // CDX API requests per minute (default 60)
+	CDXMaxRetries          int     // max retry attempts on throttle/5xx (default 5)
+	Storage                Storage // if nil, NewLocalStorage(Directory) is used
 }
 
 var downloadHTTPClient = &http.Client{
@@ -69,8 +69,9 @@ func DownloadAll(cfg *Config) error {
 		fmt.Printf("Found %d unique snapshots to download.\n", total)
 	}
 
-	if err := os.MkdirAll(cfg.Directory, 0750); err != nil {
-		return fmt.Errorf("create output dir: %w", err)
+	store := cfg.Storage
+	if store == nil {
+		store = NewLocalStorage(cfg.Directory)
 	}
 
 	pool, err := ants.NewPool(cfg.Threads)
@@ -91,7 +92,7 @@ func DownloadAll(cfg *Config) error {
 			}
 			errCh := make(chan error, 1)
 			if err := pool.Submit(func() {
-				errCh <- downloadOne(ctx, s, cfg, idx, dlProg)
+				errCh <- downloadOne(ctx, s, cfg, store, idx, dlProg)
 			}); err != nil {
 				return fmt.Errorf("submit task: %w", err)
 			}
@@ -119,17 +120,16 @@ func DownloadAll(cfg *Config) error {
 }
 
 // downloadOne downloads a single snapshot and optionally rewrites its links.
-func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotIndex, dlProg *Progress) error {
+func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, store Storage, idx *SnapshotIndex, dlProg *Progress) error {
 
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	localPath := URLToLocalPath(snap.FileURL, cfg.PrettyPath)
-	localPath = filepath.Join(cfg.Directory, filepath.FromSlash(localPath))
+	logicalPath := URLToLocalPath(snap.FileURL, cfg.PrettyPath)
 
 	// Skip existing files
-	if _, err := os.Stat(localPath); err == nil {
+	if store.Exists(logicalPath) {
 		dlProg.Inc()
 		return nil
 	}
@@ -160,39 +160,13 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 		return fmt.Errorf("HTTP %d for %s", resp.StatusCode, waybackURL)
 	}
 
-	// Ensure parent directory exists
-	if err := os.MkdirAll(filepath.Dir(localPath), 0750); err != nil {
-		return fmt.Errorf("mkdirall: %w", err)
-	}
-
-	// Stream to temp file, then rename atomically
-	tmpFile, err := os.CreateTemp(filepath.Dir(localPath), ".wbdl-*")
-	if err != nil {
-		return fmt.Errorf("create temp: %w", err)
-	}
-	tmpName := tmpFile.Name()
-	defer func() {
-		_ = tmpFile.Close()
-		_ = os.Remove(tmpName) // no-op if renamed
-	}()
-
-	// Read first 512 bytes for content sniffing
+	// Read first 512 bytes for content sniffing, then stream remainder via storage
 	first := make([]byte, 512)
 	n, _ := io.ReadFull(resp.Body, first)
 	first = first[:n]
 
-	if _, err := tmpFile.Write(first); err != nil {
-		return fmt.Errorf("write first bytes: %w", err)
-	}
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		return fmt.Errorf("write body: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("close temp: %w", err)
-	}
-
-	if err := os.Rename(tmpName, localPath); err != nil { //nolint:gosec // G703: localPath is sanitized by URLToLocalPath
-		return fmt.Errorf("rename: %w", err)
+	if err := store.Put(logicalPath, io.MultiReader(bytes.NewReader(first), resp.Body)); err != nil {
+		return fmt.Errorf("store: %w", err)
 	}
 
 	// Post-process HTML / CSS
@@ -200,13 +174,13 @@ func downloadOne(ctx context.Context, snap Snapshot, cfg *Config, idx *SnapshotI
 		ct := resp.Header.Get("Content-Type")
 		fileURL := snap.FileURL
 
-		if IsHTMLFile(localPath, ct, first) {
-			if err := ProcessHTML(localPath, fileURL, cfg, idx); err != nil && cfg.Debug {
-				log.Printf("html rewrite %s: %v", localPath, err)
+		if IsHTMLFile(logicalPath, ct, first) {
+			if err := ProcessHTML(store, logicalPath, fileURL, cfg, idx); err != nil && cfg.Debug {
+				log.Printf("html rewrite %s: %v", logicalPath, err)
 			}
-		} else if IsCSSResource(localPath, ct) {
-			if err := RewriteCSSFile(localPath, fileURL, cfg, idx); err != nil && cfg.Debug {
-				log.Printf("css rewrite %s: %v", localPath, err)
+		} else if IsCSSResource(logicalPath, ct) {
+			if err := RewriteCSSFile(store, logicalPath, fileURL, cfg, idx); err != nil && cfg.Debug {
+				log.Printf("css rewrite %s: %v", logicalPath, err)
 			}
 		}
 	}
